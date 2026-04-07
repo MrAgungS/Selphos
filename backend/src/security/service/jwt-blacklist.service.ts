@@ -19,4 +19,8 @@ export class JwtBlacklistService {
       await this.redisService.set(`blacklist:${token}`, '1', ttl);
     }
   }
+  async IsBlackListed(token: string): Promise<boolean> {
+    const result = await this.redisService.get(`blacklist:${token}`);
+    return result !== null;
+  }
 }

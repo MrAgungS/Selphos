@@ -1,6 +1,7 @@
 CREATE TABLE users (
  id binary(16) primary key,
  email varchar(255) unique,
+ name varchar(100),
  password text,
  role enum('admin','user') default 'user',
  created_at timestamp default current_timestamp
@@ -21,6 +22,8 @@ CREATE TABLE file_versions (
  file_id binary(16) not null,
  bucket varchar(100) not null,
  object_key varchar(255) not null,
+ compressed_object_key VARCHAR(255) NULL,
+ compression_status ENUM('pending','processing','done','failed','skipped') NOT NULL DEFAULT 'pending' ,
  filename varchar(255),
  mime_type varchar(100),
  size bigint,
@@ -31,6 +34,7 @@ CREATE TABLE file_versions (
 
 CREATE TABLE uploads (
  id BINARY(16) PRIMARY KEY,
+ user_id BINARY(16) NOT NULL,
  file_id BINARY(16),
  object_key VARCHAR(255) NOT NULL,
  bucket VARCHAR(100) NOT NULL,

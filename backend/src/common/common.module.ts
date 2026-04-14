@@ -34,9 +34,9 @@ import { UuidUtils } from './utils/uuid.utils';
     }),
   ],
   providers: [
+    DatabaseService,
     RedisService,
     ValidationService,
-    DatabaseService,
     UuidUtils,
     {
       provide: APP_FILTER,

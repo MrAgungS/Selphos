@@ -6,9 +6,9 @@
 **Request Body :** 
 ```json
 {
-  "email" : ".....",
-  "Password" : ".....",
-  "name" : ".....",
+  "email" : "example@gmail.com",
+  "Password" : "example123",
+  "name" : "example",
 }
 ```
 
@@ -16,8 +16,8 @@
 ```json
 {
   "data" : {
-    "email" : ".....",
-    "name" : ".....",
+    "email" : "example@gmail.com",
+    "name" : "example",
   }
 }
 ```
@@ -38,8 +38,8 @@
 **Request Body:**
 ```json
 {
-  "email" : ".....",
-  "Password" : ".....",
+  "email" : "example@gmail.com",
+  "Password" : "example123",
 }
 ```
 
@@ -47,10 +47,10 @@
 ```json
 {
   "data" : {
-    "email" : ".....",
-    "name" : ".....",
-    "access_token" : "...."
-    "refresh_token" : "...."
+    "email" : "example@gmail.com",
+    "name" : "example",
+    "access_token" : "123456"
+    "refresh_token" : "123456"
   }
 }
 ```
@@ -76,7 +76,7 @@
 Request Body: 
 ```json
 {
-  "refresh_token": "...."
+  "refresh_token": "123456"
 }
 ```
 
@@ -84,8 +84,8 @@ Request Body:
 ```json
 {
   "data" : {
-    "access_token" : "...."
-    "refresh_token" : "...."
+    "access_token" : "123456"
+    "refresh_token" : "123456"
   }
 }
 ```
@@ -114,12 +114,6 @@ Request Body:
 - authorization: access_token
 ```
 
-**Request Body:** 
-```json
-{
-  "user": "...."
-}
-```
 
 **Request Body Success:** 
 ```json

@@ -1,13 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
-import { Redis } from 'ioredis';
+import Redis from 'ioredis';
 import { Logger } from 'winston';
+import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
+import { InjectRedis } from '@nestjs-modules/ioredis';
 
 @Injectable()
 export class RedisService {
   constructor(
     @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
-    @Inject() private readonly redis: Redis,
+    @InjectRedis() private readonly redis: Redis,
   ) {
     // Log connection events from the injected Redis instance
     this.redis.on('connect', () => {

@@ -9,6 +9,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER } from '@nestjs/core';
 import { ErrorFilter } from './error/error.filter';
 import { UuidUtils } from './utils/uuid.utils';
+import { S3Service } from './s3/s3.service';
 
 @Global()
 @Module({
@@ -42,7 +43,14 @@ import { UuidUtils } from './utils/uuid.utils';
       provide: APP_FILTER,
       useClass: ErrorFilter,
     },
+    S3Service,
   ],
-  exports: [RedisService, ValidationService, DatabaseService, UuidUtils],
+  exports: [
+    RedisService,
+    ValidationService,
+    DatabaseService,
+    UuidUtils,
+    S3Service,
+  ],
 })
 export class CommonModule {}

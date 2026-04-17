@@ -14,7 +14,7 @@ import { JwtRefreshGuard } from 'src/security/guards/jwt-refresh.guard';
 
 // Remember that earlier i set JwtAuthGuard as APP_GUARD
 // which means all routes are automatically protected and require a token.
-@Controller('users')
+@Controller('/api/users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 

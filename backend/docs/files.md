@@ -142,7 +142,7 @@ Generate a presigned GET URL for downloading the active (current) version of a f
 
 ---
 
-## Restore File Version (Rollback)
+## Restore File Version
 Set a specific version as the active version. This updates `files.current_version_id`.
 **Endpoint:** `POST /api/s3/files/:file_id/versions/:version_id/restore`
 

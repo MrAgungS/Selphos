@@ -20,27 +20,38 @@ import {
 } from 'src/model/users.model';
 import { UserValidation } from './users.validation';
 
+// logger.debug must be disabled in production
 @Injectable()
 export class UsersService {
   constructor(
     @Inject(WINSTON_MODULE_PROVIDER) private logger: Logger,
-    private usersRepository: UsersRepository,
-    private validationService: ValidationService,
-    private redisService: RedisService,
-    private jwtService: JwtService,
-    private blacklistService: JwtBlacklistService,
+    private readonly usersRepository: UsersRepository,
+    private readonly validationService: ValidationService,
+    private readonly redisService: RedisService,
+    private readonly jwtService: JwtService,
+    private readonly blacklistService: JwtBlacklistService,
   ) {}
 
-  private generateAccessToken(user_id: string, email: string) {
+  private generateAccessToken(
+    user_id: string,
+    email: string,
+    name: string,
+    role: string,
+  ) {
     return this.jwtService.sign(
-      { sub: user_id, email },
+      { sub: user_id, email, name, role },
       { secret: process.env.JWT_SECRET, expiresIn: '15m' },
     );
   }
 
-  private generateRefreshToken(user_id: string, email: string) {
+  private generateRefreshToken(
+    user_id: string,
+    email: string,
+    name: string,
+    role: string,
+  ) {
     return this.jwtService.sign(
-      { sub: user_id, email },
+      { sub: user_id, email, name, role },
       { secret: process.env.JWT_SECRET, expiresIn: '7d' },
     );
   }
@@ -55,7 +66,7 @@ export class UsersService {
   }
 
   async register(request: RegisterUserDTO) {
-    this.logger.debug(`Registering user with email : %s`, request.email);
+    this.logger.info('Registering user', { email: request.email });
 
     const registerRequest = this.validationService.validate(
       UserValidation.REGISTER,
@@ -67,6 +78,9 @@ export class UsersService {
     );
 
     if (existingUser) {
+      this.logger.warn('Registration failed, email already exists', {
+        email: registerRequest.email,
+      });
       throw new ConflictException('email already exists');
     }
 
@@ -78,6 +92,9 @@ export class UsersService {
       registerRequest.password,
     );
 
+    this.logger.info('User registered successfully', {
+      email: user.email,
+    });
     return {
       email: user.email,
       name: user.name,
@@ -85,7 +102,7 @@ export class UsersService {
   }
 
   async login(request: LoginUserDTO) {
-    this.logger.debug(`Logging in user with email : %s`, request.email);
+    this.logger.info('Login attempt', { email: request.email });
 
     const loginRequest = this.validationService.validate(
       UserValidation.LOGIN,
@@ -94,6 +111,9 @@ export class UsersService {
 
     const user = await this.usersRepository.findByEmail(loginRequest.email);
     if (!user) {
+      this.logger.warn('Login failed, email not found', {
+        email: loginRequest.email,
+      });
       throw new UnauthorizedException('invalid email');
     }
 
@@ -102,14 +122,31 @@ export class UsersService {
       user.password,
     );
     if (!isPasswordValid) {
+      this.logger.warn('Login failed, invalid password', {
+        email: loginRequest.email,
+      });
       throw new UnauthorizedException('invalid password');
     }
 
-    const access_token = this.generateAccessToken(user.id, user.email);
-    const refresh_token = this.generateRefreshToken(user.id, user.email);
+    const access_token = this.generateAccessToken(
+      user.id,
+      user.email,
+      user.name,
+      user.role,
+    );
+    const refresh_token = this.generateRefreshToken(
+      user.id,
+      user.email,
+      user.name,
+      user.role,
+    );
 
     await this.saveRefreshToken(user.id, refresh_token);
 
+    this.logger.info('User logged in successfully', {
+      user_id: user.id,
+      email: user.email,
+    });
     return {
       email: user.email,
       name: user.name,
@@ -124,25 +161,53 @@ export class UsersService {
       payload = this.jwtService.verify(refresh_token, {
         secret: process.env.JWT_REFRESH_SECRET,
       });
-    } catch {
+    } catch (error: unknown) {
+      this.logger.warn('Refresh token invalid or expired', { error });
       throw new UnauthorizedException('Refresh token is invalid or expired');
     }
 
+    this.logger.debug('Refresh token verified, checking stored token', {
+      user_id: payload.sub,
+    });
     const storedToken = await this.redisService.get(
       `refresh_token:${payload.sub}`,
     );
-    if (!storedToken) throw new ForbiddenException('Refresh token not found');
+    if (!storedToken) {
+      this.logger.warn('Refresh token not found in Redis', {
+        user_id: payload.sub,
+      });
+      throw new ForbiddenException('Refresh token not found');
+    }
 
     const isMatch = await bcrypt.compare(refresh_token, storedToken);
-    if (!isMatch) throw new ForbiddenException('Refresh token is invalid');
+    if (!isMatch) {
+      this.logger.warn('Refresh token is invalid', { user_id: payload.sub });
+      throw new ForbiddenException('Refresh token is invalid');
+    }
 
     const user = await this.usersRepository.findById(payload.sub);
-    if (!user) throw new UnauthorizedException('User not found');
+    if (!user) {
+      this.logger.warn('User not found during token refresh', {
+        user_id: payload.sub,
+      });
+      throw new UnauthorizedException('User not found');
+    }
 
-    const new_access_token = this.generateAccessToken(user.id, user.email);
-    const new_refresh_token = this.generateRefreshToken(user.id, user.email);
+    const new_access_token = this.generateAccessToken(
+      user.id,
+      user.email,
+      user.name,
+      user.role,
+    );
+    const new_refresh_token = this.generateRefreshToken(
+      user.id,
+      user.email,
+      user.name,
+      user.role,
+    );
     await this.saveRefreshToken(user.id, new_refresh_token);
 
+    this.logger.info('Token refreshed successfully', { user_id: user.id });
     return {
       access_token: new_access_token,
       refresh_token: new_refresh_token,
@@ -150,7 +215,7 @@ export class UsersService {
   }
 
   async logout(request: LogOutUserDTO) {
-    this.logger.debug('Logging out user with ID: %s', request.user_id);
+    this.logger.info('Logout attempt', { user_id: request.user_id });
     const logoutRequest = this.validationService.validate(
       UserValidation.LOGOUT,
       request,
@@ -159,6 +224,9 @@ export class UsersService {
     await this.blacklistService.blackListToken(logoutRequest.access_token);
     await this.redisService.del(`refresh_token:${logoutRequest.user_id}`);
 
+    this.logger.info('User logged out successfully', {
+      user_id: logoutRequest.user_id,
+    });
     return { data: true };
   }
 }

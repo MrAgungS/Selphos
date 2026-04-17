@@ -6,6 +6,7 @@ import { JwtBlacklistService } from '../service/jwt-blacklist.service';
 import { JwtPayload } from '../model/jwt-payload.model';
 import { Request } from 'express';
 import { Role } from '../model/role.model';
+import { UuidUtils } from 'src/common/utils/uuid.utils';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -30,20 +31,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     const users = await this.db.query<{
-      id: string;
+      id: Buffer;
+      name: string;
       email: string;
       role: string;
-    }>('SELECT id, email, role FROM users WHERE id = ? LIMIT 1', [payload.sub]);
+    }>('SELECT id, name, email, role FROM users WHERE id = ? LIMIT 1', [
+      UuidUtils.toUuidBinary(payload.sub),
+    ]);
 
     const user = users[0];
-
     if (!user) throw new UnauthorizedException();
 
-    payload = {
-      sub: user.id,
+    return {
+      id: UuidUtils.toUuidString(user.id),
+      name: user.name,
       email: user.email,
       role: user.role as Role,
     };
-    return payload;
   }
 }

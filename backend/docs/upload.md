@@ -52,7 +52,7 @@
 
 ---
 
-## Direct PUT to RustFS (Step 2)
+## Direct PUT to RustFS
 
 > This step is performed **by the client directly to RustFS**. The API is not involved at all.
 
@@ -71,7 +71,7 @@ Save the `ETag` value — it will be used in Step 3 for integrity verification.
 
 ---
 
-## Confirm Upload (Step 3)
+## Confirm Upload
 
 Notify the API that the upload is complete. The API will save the `file_version` to the database and queue a compression job if the file type is compressible.
 
@@ -137,7 +137,7 @@ Notify the API that the upload is complete. The API will save the `file_version`
 
 ---
 
-## Get Upload Status (Polling)
+## Get Upload Status
 
 Poll this endpoint after Step 3 to track compression progress.
 

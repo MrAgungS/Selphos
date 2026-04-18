@@ -226,4 +226,32 @@ export class UploadsRepository {
     }
     return { upload, version };
   }
+
+  // Update the compression status for file_versions (optional: update the object key as well)
+  async updateCompressionStatus(
+    version_id: string,
+    status: CompressionStatus,
+    compressed_object_key?: string,
+  ): Promise<void> {
+    await this.databaseService.execute(
+      `UPDATE file_versions 
+       SET compression_status = ?, compressed_object_key = COALESCE(?, compressed_object_key)
+       WHERE id = ?`,
+      [
+        status,
+        compressed_object_key ?? null,
+        UuidUtils.toUuidBinary(version_id),
+      ],
+    );
+  }
+
+  // Retrieve the file_version based on the ID
+  async findVersionById(version_id: string): Promise<FileVersion | null> {
+    const rows = await this.databaseService.query<FileVersionRow>(
+      'SELECT * FROM file_versions WHERE id = ?',
+      [UuidUtils.toUuidBinary(version_id)],
+    );
+    if (rows.length === 0) return null;
+    return this.mapToFileVersion(rows[0]);
+  }
 }

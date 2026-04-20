@@ -11,7 +11,8 @@ import * as fs from 'fs';
 
 @Injectable()
 export class S3Service {
-  constructor(private readonly logger: Logger) {}
+  private readonly logger = new Logger(S3Service.name);
+
   private s3 = new S3Client({
     endpoint: process.env.RUSTFS_ENDPOINT!,
     region: 'auto',

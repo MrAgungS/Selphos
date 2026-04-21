@@ -17,6 +17,12 @@ import {
   CompressionStatus,
   UploadsStatus,
 } from './interfaces/uploads.interface';
+import { InjectQueue } from '@nestjs/bullmq';
+import {
+  COMPRESSION_QUEUE,
+  CompressionJobData,
+} from 'src/queue/queue.constants';
+import { Queue } from 'bullmq';
 
 // Compressible MIME types
 const COMPRESSIBLE_MIME_TYPES = [
@@ -35,6 +41,7 @@ export class UploadsService {
     private readonly uploadsRepository: UploadsRepository,
     private readonly s3Service: S3Service,
     private readonly validationService: ValidationService,
+    @InjectQueue(COMPRESSION_QUEUE) private readonly compressionQueue: Queue,
   ) {}
 
   async initiateUpload(user_id: string, request: InitiateUploadDto) {
@@ -186,7 +193,29 @@ export class UploadsService {
       upload_id,
       UploadsStatus.COMPLETED,
     );
-    // TODO: Queue the compression job if compressionStatus === 'pending'
+
+    // Dispatch the compression job if necessary
+    if (compressionStatus === CompressionStatus.PENDING) {
+      const jobData: CompressionJobData = {
+        version_id: version.id,
+        file_id: upload.file_id!,
+        object_key: upload.object_key,
+        bucket_raw: upload.bucket,
+        bucket_compressed: process.env.RUSTFS_COMPRESSED_BUCKET!,
+        mime_type: confirmRequest.mime_type,
+        filename: confirmRequest.filename,
+      };
+
+      await this.compressionQueue.add('compress', jobData, {
+        attempts: 3, // Maximum retry: 3 times
+        backoff: {
+          type: 'exponential',
+          delay: 5000, // First retry after 5s, then 10s, then 20s
+        },
+        removeOnComplete: 100, // Save the last 100 completed jobs
+        removeOnFail: 50, // Remove the last 50 failed jobs
+      });
+    }
 
     this.logger.info('Upload confirmed successfully', {
       user_id,

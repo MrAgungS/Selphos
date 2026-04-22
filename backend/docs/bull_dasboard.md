@@ -7,7 +7,6 @@ New features will be added once the files, uploads, user interface, and frontend
 ## Overview
 
 Bull Dashboard is an admin-only UI for monitoring and managing BullMQ job queues.
-It is **not a REST API** — it is a web UI mounted at a specific route on the server.
 
 > Access is restricted to users with `role = 'admin'` only.
 > Non-admin requests will receive a `403 Forbidden` response.

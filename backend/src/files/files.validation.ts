@@ -8,7 +8,7 @@ export class FilesValidation {
     mime_type: z.string().min(1).optional(),
   });
 
-  static readonly RESTORE_FILES: ZodType = z.object({
+  static readonly RESTORE_VERSION: ZodType = z.object({
     file_id: z.string().min(1),
     version_id: z.string().min(1),
     user_id: z.string().min(1),

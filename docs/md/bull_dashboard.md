@@ -20,6 +20,7 @@ It is **not a REST API** — it is a web UI mounted at a specific route on the s
 
 **Auth:** HTTP Basic Auth (username + password via environment variables)
 
+> Just example,
 ```
 BULL_DASHBOARD_USER=admin
 BULL_DASHBOARD_PASSWORD=supersecret

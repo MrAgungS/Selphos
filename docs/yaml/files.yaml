@@ -1,0 +1,472 @@
+openapi: 3.2.0
+info:
+  title: Files Management API
+  version: 1.0.0
+  description: API specification for managing files stored in RustFS (S3-compatible storage)
+
+servers:
+  # You can customize this as needed
+  - url: http://localhost:3000
+    description: Local development server
+
+paths:
+  /api/s3/files:
+    get:
+      summary: List all files
+      operationId: listFiles
+      tags:
+        - Files
+      description: >
+        Returns a paginated list of files belonging to the currently
+        logged-in user (`user_id` from token). Files with `is_deleted = true`
+        are excluded.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          description: Page number
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          required: false
+          description: Items per page (max 100)
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: mime_type
+          in: query
+          required: false
+          description: Filter by MIME type, e.g. `image/jpeg`
+          schema:
+            type: string
+            example: image/jpeg
+      responses:
+        '200':
+          description: Files retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListFilesSuccess'
+              example:
+                data:
+                  files:
+                    - file_id: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+                      filename: photo.jpg
+                      mime_type: image/jpeg
+                      size: 2048576
+                      compression_status: done
+                      version_count: 3
+                      created_at: "2025-01-01T12:00:00.000Z"
+                      updated_at: "2025-01-01T12:00:45.000Z"
+                  total: 42
+                  page: 1
+                  limit: 20
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 401
+                errors: Access token invalid
+
+  /api/s3/files/{file_id}/versions:
+    get:
+      summary: Get file versions
+      operationId: getFileVersions
+      tags:
+        - Files
+      description: >
+        Retrieve all versions of a file. Useful for rollback purposes.
+        `is_current = true` indicates the active version, matching
+        `files.current_version_id`. If `compression_status` is `pending`,
+        `processing`, or `failed`, then `compressed_object_key` will be `null`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          description: Unique identifier of the file
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: File versions retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileVersionsSuccess'
+              example:
+                data:
+                  file_id: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+                  filename: photo.jpg
+                  versions:
+                    - version_id: 3d2a4b6c-1e5f-7890-ab12-cd34ef567890
+                      is_current: true
+                      object_key: uploads/raw/7c9e.../photo.jpg
+                      compressed_object_key: uploads/compressed/7c9e.../photo.webp
+                      compression_status: done
+                      mime_type: image/jpeg
+                      size: 2048576
+                      etag: 686897696a7c876b7e
+                      created_at: "2025-01-02T09:00:00.000Z"
+                    - version_id: 1a2b3c4d-5e6f-7890-ab12-cd34ef567890
+                      is_current: false
+                      object_key: uploads/raw/7c9e.../photo_v1.jpg
+                      compressed_object_key: uploads/compressed/7c9e.../photo_v1.webp
+                      compression_status: done
+                      mime_type: image/jpeg
+                      size: 1890432
+                      etag: abc123def456
+                      created_at: "2025-01-01T12:00:00.000Z"
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 404
+                errors: File not found
+
+  /api/s3/files/{file_id}/download:
+    get:
+      summary: Get download URL
+      operationId: getDownloadUrl
+      tags:
+        - Files
+      description: >
+        Generate a presigned GET URL for downloading the active (current)
+        version of a file. If `compression_status` is `pending`, `processing`,
+        or `failed`, the URL will point to the raw file (`object_key`) instead
+        of `compressed_object_key`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          description: Unique identifier of the file
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Download URL generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadUrlSuccess'
+              example:
+                data:
+                  file_id: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+                  filename: photo.jpg
+                  download_url: "http://localhost:9000/my-bucket/uploads/compressed/.../photo.webp?X-Amz-Signature=..."
+                  expires_at: "2025-01-01T13:00:00.000Z"
+                  mime_type: image/jpeg
+                  size: 2048576
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 404
+                errors: File not found
+        '410':
+          description: File has been deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 410
+                errors: File has been deleted
+
+  /api/s3/files/{file_id}/versions/{version_id}/restore:
+    post:
+      summary: Restore file version
+      operationId: restoreFileVersion
+      tags:
+        - Files
+      description: >
+        Set a specific version as the active version. This updates
+        `files.current_version_id`. Request body is empty.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          description: Unique identifier of the file
+          schema:
+            type: string
+            format: uuid
+        - name: version_id
+          in: path
+          required: true
+          description: Unique identifier of the version to restore
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: File version restored successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestoreVersionSuccess'
+              example:
+                data:
+                  file_id: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+                  restored_version_id: 1a2b3c4d-5e6f-7890-ab12-cd34ef567890
+                  message: File restored to selected version
+        '403':
+          description: Version does not belong to this file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 403
+                errors: Version does not belong to this file
+        '404':
+          description: Version not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 404
+                errors: Version not found
+
+  /api/s3/files/{file_id}:
+    delete:
+      summary: Delete file (soft delete)
+      operationId: deleteFile
+      tags:
+        - Files
+      description: >
+        Mark a file as deleted by setting `is_deleted = true` in the `files`
+        table. The file is NOT removed from RustFS.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          description: Unique identifier of the file
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: File deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteFileSuccess'
+              example:
+                data: true
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 404
+                errors: File not found
+        '409':
+          description: File is already deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 409
+                errors: File is already deleted
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token obtained from the login or refresh endpoint
+
+  schemas:
+    FileItem:
+      type: object
+      properties:
+        file_id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        mime_type:
+          type: string
+        size:
+          type: integer
+          description: File size in bytes
+        compression_status:
+          type: string
+          enum:
+            - pending
+            - processing
+            - done
+            - failed
+            - skipped
+        version_count:
+          type: integer
+          description: Total number of versions for this file
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ListFilesSuccess:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            files:
+              type: array
+              items:
+                $ref: '#/components/schemas/FileItem'
+            total:
+              type: integer
+              description: Total number of files (across all pages)
+            page:
+              type: integer
+              description: Current page number
+            limit:
+              type: integer
+              description: Items per page
+
+    FileVersion:
+      type: object
+      properties:
+        version_id:
+          type: string
+          format: uuid
+        is_current:
+          type: boolean
+          description: Whether this is the currently active version
+        object_key:
+          type: string
+          description: Storage path of the raw file in RustFS
+        compressed_object_key:
+          type: string
+          nullable: true
+          description: >
+            Storage path of the compressed file. `null` if compression_status
+            is `pending`, `processing`, or `failed`.
+        compression_status:
+          type: string
+          enum:
+            - pending
+            - processing
+            - done
+            - failed
+            - skipped
+        mime_type:
+          type: string
+        size:
+          type: integer
+          description: File size in bytes
+        etag:
+          type: string
+          description: ETag value returned by RustFS for integrity verification
+        created_at:
+          type: string
+          format: date-time
+
+    FileVersionsSuccess:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            file_id:
+              type: string
+              format: uuid
+            filename:
+              type: string
+            versions:
+              type: array
+              items:
+                $ref: '#/components/schemas/FileVersion'
+
+    DownloadUrlSuccess:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            file_id:
+              type: string
+              format: uuid
+            filename:
+              type: string
+            download_url:
+              type: string
+              format: uri
+              description: Presigned GET URL to download the file directly from RustFS
+            expires_at:
+              type: string
+              format: date-time
+              description: Timestamp when the download URL expires (ISO 8601)
+            mime_type:
+              type: string
+            size:
+              type: integer
+              description: File size in bytes
+
+    RestoreVersionSuccess:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            file_id:
+              type: string
+              format: uuid
+            restored_version_id:
+              type: string
+              format: uuid
+              description: ID of the version that was restored as active
+            message:
+              type: string
+              example: File restored to selected version
+
+    DeleteFileSuccess:
+      type: object
+      properties:
+        data:
+          type: boolean
+          example: true
+
+    ErrorResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          description: HTTP status code
+        errors:
+          type: string
+          description: Human-readable error message

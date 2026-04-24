@@ -1,0 +1,246 @@
+openapi: 3.2.0
+info:
+  title: Serve File API
+  version: 1.0.0
+  description: >
+    Provides time-limited public access to uploaded files via presigned URLs
+    generated from RustFS. The API is not in the data path — clients download
+    directly from RustFS using the signed URL.
+
+    New features will be added once the files, uploads, user interface, and
+    frontend of Selphos are complete.
+
+servers:
+  # You can customize this as needed
+  - url: http://localhost:3000
+    description: Local development server
+
+paths:
+  /api/s3/files/{file_id}/share:
+    post:
+      summary: Get public share link
+      operationId: getPublicShareLink
+      tags:
+        - Serve
+      description: >
+        Generate a time-limited public URL for sharing a file without requiring
+        authentication. Anyone with the URL can access the file until it expires.
+        If `compression_status` is `done`, the URL points to the compressed file;
+        otherwise it falls back to the raw file.
+
+        Both endpoints generate presigned URLs — the API is not in the data path.
+        RustFS is never exposed directly to the client; the URL is signed and
+        time-limited. For large video files, presigned URLs are preferred over
+        server-side streaming to avoid memory pressure on the API server.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          description: Unique identifier of the file
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShareRequest'
+            example:
+              expires_in: 3600
+      responses:
+        '200':
+          description: Share URL generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShareLinkSuccess'
+              example:
+                data:
+                  file_id: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+                  filename: photo.jpg
+                  share_url: "http://localhost:9000/my-bucket-compressed/uploads/compressed/.../photo.webp?X-Amz-Signature=..."
+                  expires_at: "2025-01-01T14:00:00.000Z"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 400
+                errors: expires_in must not exceed 604800 seconds (7 days)
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 404
+                errors: File not found
+        '410':
+          description: File has been deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 410
+                errors: File has been deleted
+
+  /api/s3/files/{file_id}/versions/{version_id}/share:
+    post:
+      summary: Get share link for specific version
+      operationId: getVersionShareLink
+      tags:
+        - Serve
+      description: >
+        Generate a public URL for a specific file version instead of the
+        current active version. Same presigned URL mechanism applies.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          description: Unique identifier of the file
+          schema:
+            type: string
+            format: uuid
+        - name: version_id
+          in: path
+          required: true
+          description: Unique identifier of the specific version to share
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShareRequest'
+            example:
+              expires_in: 3600
+      responses:
+        '200':
+          description: Share URL generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionShareLinkSuccess'
+              example:
+                data:
+                  file_id: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+                  version_id: 1a2b3c4d-5e6f-7890-ab12-cd34ef567890
+                  filename: photo.jpg
+                  share_url: "http://localhost:9000/my-bucket/uploads/raw/.../photo.jpg?X-Amz-Signature=..."
+                  expires_at: "2025-01-01T14:00:00.000Z"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 400
+                errors: expires_in must not exceed 604800 seconds (7 days)
+        '403':
+          description: Version does not belong to this file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 403
+                errors: Version does not belong to this file
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 404
+                errors: File not found
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token obtained from the login or refresh endpoint
+
+  schemas:
+    ShareRequest:
+      type: object
+      properties:
+        expires_in:
+          type: integer
+          default: 3600
+          minimum: 1
+          maximum: 604800
+          description: >
+            Expiry duration in seconds. Default: 3600 (1 hour).
+            Max: 604800 (7 days).
+          example: 3600
+
+    ShareLinkSuccess:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            file_id:
+              type: string
+              format: uuid
+            filename:
+              type: string
+            share_url:
+              type: string
+              format: uri
+              description: >
+                Presigned public URL to access the file directly from RustFS.
+                Points to the compressed file if available, otherwise the raw file.
+            expires_at:
+              type: string
+              format: date-time
+              description: Timestamp when the share URL expires (ISO 8601)
+
+    VersionShareLinkSuccess:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            file_id:
+              type: string
+              format: uuid
+            version_id:
+              type: string
+              format: uuid
+              description: The specific version that was shared
+            filename:
+              type: string
+            share_url:
+              type: string
+              format: uri
+              description: Presigned public URL to access the specific version directly from RustFS
+            expires_at:
+              type: string
+              format: date-time
+              description: Timestamp when the share URL expires (ISO 8601)
+
+    ErrorResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          description: HTTP status code
+        errors:
+          type: string
+          description: Human-readable error message

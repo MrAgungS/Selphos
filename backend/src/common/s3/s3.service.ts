@@ -64,4 +64,13 @@ export class S3Service {
     });
     await this.s3.send(command);
   }
+
+  async generateDownloadUrl(
+    bucket: string,
+    object_key: string,
+    expiresIn: number = 3600,
+  ): Promise<string> {
+    const command = new GetObjectCommand({ Bucket: bucket, Key: object_key });
+    return getSignedUrl(this.s3, command, { expiresIn });
+  }
 }

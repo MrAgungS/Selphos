@@ -1,0 +1,346 @@
+openapi: 3.2.0
+info:
+  title: Upload API
+  version: 1.0.0
+  description: API specification for file upload management via RustFS (S3-compatible storage)
+
+servers:
+  # You can customize this as needed
+  - url: http://localhost:3000
+    description: Local development server
+
+paths:
+  /api/s3/uploads/initiate:
+    post:
+      summary: Initiate a new file upload
+      operationId: initiateUpload
+      tags:
+        - Uploads
+      description: >
+        Generates a presigned URL valid for 15 minutes for the client to PUT
+        the file directly to RustFS. Provide `file_id` only when uploading a
+        new version of an existing file — omit it for a brand-new file.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitiateUploadRequest'
+            example:
+              filename: photo.jpg
+              mime_type: image/jpeg
+              size: 2048576
+      responses:
+        '200':
+          description: Presigned URL generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InitiateUploadSuccess'
+              example:
+                data:
+                  upload_id: 550e8400-e29b-41d4-a716-446655440000
+                  file_id: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+                  presigned_url: "http://localhost:9000/my-bucket/uploads/raw/.../photo.jpg?X-Amz-Signature=..."
+                  expires_at: "2025-01-01T12:15:00.000Z"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 400
+                errors: mime_type is required
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 401
+                errors: Access token invalid
+
+  /api/s3/uploads/{upload_id}/confirm:
+    post:
+      summary: Confirm upload completion
+      operationId: confirmUpload
+      tags:
+        - Uploads
+      description: >
+        Notify the API that the client has finished PUT-ing to RustFS.
+        The API will save the `file_version` to the database and queue a
+        compression job if the file type is compressible. The `etag` field
+        is optional but recommended for integrity checking.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: upload_id
+          in: path
+          required: true
+          description: The upload ID returned from the initiate endpoint
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmUploadRequest'
+            example:
+              filename: photo.jpg
+              mime_type: image/jpeg
+              size: 2048576
+              etag: 686897696a7c876b7e
+      responses:
+        '200':
+          description: Upload confirmed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfirmUploadSuccess'
+              example:
+                data:
+                  version_id: 3d2a4b6c-1e5f-7890-ab12-cd34ef567890
+                  compression_status: pending
+        '404':
+          description: Upload not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 404
+                errors: Upload not found
+        '409':
+          description: Upload already confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 409
+                errors: Upload already confirmed
+        '410':
+          description: Upload has expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 410
+                errors: Upload has expired
+
+  /api/s3/uploads/{upload_id}/status:
+    get:
+      summary: Get upload status
+      operationId: getUploadStatus
+      tags:
+        - Uploads
+      description: >
+        Poll this endpoint after confirming an upload to track compression
+        progress. Reflects both the upload status and the compression job
+        status from the `file_versions` table.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: upload_id
+          in: path
+          required: true
+          description: The upload ID returned from the initiate endpoint
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Upload status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadStatusSuccess'
+              example:
+                data:
+                  upload_id: 550e8400-e29b-41d4-a716-446655440000
+                  upload_status: COMPLETED
+                  version_id: 3d2a4b6c-1e5f-7890-ab12-cd34ef567890
+                  compression_status: done
+                  created_at: "2025-01-01T12:00:00.000Z"
+                  updated_at: "2025-01-01T12:00:45.000Z"
+        '404':
+          description: Upload not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 404
+                errors: Upload not found
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token obtained from the login or refresh endpoint
+
+  schemas:
+    InitiateUploadRequest:
+      type: object
+      required:
+        - filename
+        - mime_type
+        - size
+      properties:
+        filename:
+          type: string
+          description: Original filename including extension
+          example: photo.jpg
+        mime_type:
+          type: string
+          description: MIME type of the file
+          example: image/jpeg
+        size:
+          type: integer
+          description: File size in bytes
+          example: 2048576
+        file_id:
+          type: string
+          format: uuid
+          description: >
+            Optional. Provide only when uploading a new version of an existing
+            file. Omit for a brand-new file.
+          example: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+
+    InitiateUploadSuccess:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            upload_id:
+              type: string
+              format: uuid
+              description: Unique identifier for this upload session
+            file_id:
+              type: string
+              format: uuid
+              description: Unique identifier for the file (new or existing)
+            presigned_url:
+              type: string
+              format: uri
+              description: Presigned URL to PUT the file directly to RustFS. Valid for 15 minutes.
+            expires_at:
+              type: string
+              format: date-time
+              description: Timestamp when the presigned URL expires (ISO 8601)
+
+    ConfirmUploadRequest:
+      type: object
+      required:
+        - filename
+        - mime_type
+        - size
+      properties:
+        filename:
+          type: string
+          description: Original filename including extension
+          example: photo.jpg
+        mime_type:
+          type: string
+          description: MIME type of the file
+          example: image/jpeg
+        size:
+          type: integer
+          description: File size in bytes
+          example: 2048576
+        etag:
+          type: string
+          description: >
+            Optional but recommended. ETag value returned by RustFS after the
+            PUT request, used for integrity verification.
+          example: 686897696a7c876b7e
+
+    ConfirmUploadSuccess:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            version_id:
+              type: string
+              format: uuid
+              description: ID of the newly created file version record
+            compression_status:
+              type: string
+              enum:
+                - pending
+                - skipped
+              description: >
+                Initial compression status after confirm.
+                `pending` means a compression job has been queued (compressible file types such as image/video).
+                `skipped` means the file type is not compressible (PDF, ZIP, etc.).
+
+    UploadStatusSuccess:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            upload_id:
+              type: string
+              format: uuid
+            upload_status:
+              type: string
+              enum:
+                - INITIATED
+                - UPLOADING
+                - COMPLETED
+                - FAILED
+              description: >
+                Status of the upload session (from the `uploads` table).
+                `INITIATED`: presigned URL generated, client has not started uploading.
+                `UPLOADING`: client is currently PUT-ing to RustFS.
+                `COMPLETED`: confirm has been called, file is saved.
+                `FAILED`: upload failed or expired.
+            version_id:
+              type: string
+              format: uuid
+              description: ID of the file version record (available after COMPLETED)
+            compression_status:
+              type: string
+              enum:
+                - pending
+                - processing
+                - done
+                - failed
+                - skipped
+              description: >
+                Status of the compression job (from the `file_versions` table).
+                `pending`: job is queued, worker has not picked it up yet.
+                `processing`: worker is actively compressing.
+                `done`: compressed file is ready, `compressed_object_key` is populated.
+                `failed`: compression failed, raw file is still served.
+                `skipped`: file type is not compressible.
+            created_at:
+              type: string
+              format: date-time
+              description: Timestamp when the upload was initiated (ISO 8601)
+            updated_at:
+              type: string
+              format: date-time
+              description: Timestamp of the last status update (ISO 8601)
+
+    ErrorResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          description: HTTP status code
+        errors:
+          type: string
+          description: Human-readable error message

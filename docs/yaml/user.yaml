@@ -1,0 +1,270 @@
+openapi: 3.2.0
+info:
+  title: User API
+  version: 1.0.0
+  description: API specification for user authentication and session management
+
+servers:
+  # You can customize this as needed
+  - url: http://localhost:3000
+    description: Local development server
+
+paths:
+  /api/users/register:
+    post:
+      summary: Register a new user
+      operationId: registerUser
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example:
+              email: example@gmail.com
+              password: example123
+              name: example
+      responses:
+        '201':
+          description: User successfully registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterSuccess'
+              example:
+                data:
+                  email: example@gmail.com
+                  name: example
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 409
+                errors: Email already registered
+
+  /api/users/login:
+    post:
+      summary: Login with existing credentials
+      operationId: loginUser
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: example@gmail.com
+              password: example123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginSuccess'
+              example:
+                data:
+                  email: example@gmail.com
+                  name: example
+                  access_token: "123456"
+                  refresh_token: "123456"
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 401
+                errors: Email or Password is wrong
+
+  /api/users/refresh:
+    post:
+      summary: Refresh access token
+      operationId: refreshToken
+      tags:
+        - Auth
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+            example:
+              refresh_token: "123456"
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshSuccess'
+              example:
+                data:
+                  access_token: "123456"
+                  refresh_token: "123456"
+        '401':
+          description: Refresh token is invalid or expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 401
+                errors: Refresh token is invalid or expired
+        '403':
+          description: Refresh token is invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 403
+                errors: Refresh token is invalid
+
+  /api/users/logout:
+    post:
+      summary: Logout current user
+      operationId: logoutUser
+      tags:
+        - Auth
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutSuccess'
+              example:
+                data: true
+        '401':
+          description: Access token invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 401
+                errors: Access token invalid
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token obtained from login or refresh endpoint
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - name
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+        password:
+          type: string
+          minLength: 8
+          description: User's password
+        name:
+          type: string
+          description: User's display name
+
+    RegisterSuccess:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            email:
+              type: string
+              format: email
+            name:
+              type: string
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+        password:
+          type: string
+          description: User's password
+
+    LoginSuccess:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            email:
+              type: string
+              format: email
+            name:
+              type: string
+            access_token:
+              type: string
+              description: Short-lived access token
+            refresh_token:
+              type: string
+              description: Long-lived refresh token
+
+    RefreshRequest:
+      type: object
+      required:
+        - refresh_token
+      properties:
+        refresh_token:
+          type: string
+          description: Valid refresh token
+
+    RefreshSuccess:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            access_token:
+              type: string
+              description: New short-lived access token
+            refresh_token:
+              type: string
+              description: New long-lived refresh token
+
+    LogoutSuccess:
+      type: object
+      properties:
+        data:
+          type: boolean
+          example: true
+
+    ErrorResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          description: HTTP status code
+        errors:
+          type: string
+          description: Human-readable error message

@@ -5,6 +5,7 @@ import { UsersModule } from './users/users.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { QueueModule } from './queue/queue.module';
 import { CompressionModule } from './compression/compression.module';
+import { FilesModule } from './files/files.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { CompressionModule } from './compression/compression.module';
     UploadsModule,
     QueueModule,
     CompressionModule,
+    FilesModule,
   ],
   controllers: [],
   providers: [],

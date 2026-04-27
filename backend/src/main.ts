@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { LoggerService } from '@nestjs/common';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -9,6 +10,12 @@ async function bootstrap() {
   const logger = app.get<LoggerService>(WINSTON_MODULE_NEST_PROVIDER);
   app.useLogger(logger);
 
+  app.enableCors({
+    origin: process.env.FRONTEND_URL,
+    credentials: true,
+    allowedHeaders: 'Content-Type, Authorization',
+  });
+  app.use(cookieParser());
   await app.listen(Number(process.env.PORT));
 }
 bootstrap();

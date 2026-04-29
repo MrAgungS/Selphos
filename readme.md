@@ -1,9 +1,7 @@
 # Selphos
 > This project is currently under development.
 
-> I’m currently working on the frontend, and honestly… it looks absolutely horrible right now
-
-> But don’t worry, I’ll make it way better later
+> Just need to Test it and creating unit tests for backend
 
 So, what is Selphos? It’s simple—I’m just experimenting with how cloud-based storage works, which is something you might use. So I’m trying to create something similar, but for now, Phoeos is designed to store videos and photos. However, I might add some new features later.
 

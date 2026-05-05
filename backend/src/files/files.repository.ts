@@ -189,6 +189,15 @@ export class FilesRepository {
     );
   }
 
+  // Check if version exists
+  async versionExists(version_id: string): Promise<boolean> {
+    const rows = await this.databaseService.query<{ id: Buffer }>(
+      'SELECT id FROM file_versions WHERE id = ?',
+      [UuidUtils.toUuidBinary(version_id)],
+    );
+    return rows.length > 0;
+  }
+
   // Soft delete
   async softDelete(
     file_id: string,

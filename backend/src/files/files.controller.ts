@@ -2,6 +2,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Query,
@@ -52,6 +54,7 @@ export class FilesController {
   }
 
   @Post(':file_id/versions/:version_id/restore')
+  @HttpCode(HttpStatus.OK)
   async restoreVersion(
     @CurrentUser() user: RequestUser,
     @Param('file_id') file_id: string,

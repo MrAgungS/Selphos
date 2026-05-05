@@ -35,8 +35,9 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtRefreshGuard)
   @Post('refresh')
-  async refresh(@Request() request: { refresh_token: string }) {
-    return this.usersService.refresh(request.refresh_token);
+  async refresh(@Request() request: { headers: { authorization: string } }) {
+    const token = request.headers.authorization.split(' ')[1];
+    return this.usersService.refresh(token);
   }
 
   @HttpCode(HttpStatus.OK)

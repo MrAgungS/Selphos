@@ -52,7 +52,7 @@ export class UsersService {
   ) {
     return this.jwtService.sign(
       { sub: user_id, email, name, role },
-      { secret: process.env.JWT_SECRET, expiresIn: '7d' },
+      { secret: process.env.JWT_REFRESH_SECRET, expiresIn: '7d' },
     );
   }
 
@@ -96,8 +96,10 @@ export class UsersService {
       email: user.email,
     });
     return {
-      email: user.email,
-      name: user.name,
+      data: {
+        email: user.email,
+        name: user.name,
+      },
     };
   }
 
@@ -114,7 +116,7 @@ export class UsersService {
       this.logger.warn('Login failed, email not found', {
         email: loginRequest.email,
       });
-      throw new UnauthorizedException('invalid email');
+      throw new ConflictException('invalid email');
     }
 
     const isPasswordValid = await bcrypt.compare(
@@ -125,7 +127,7 @@ export class UsersService {
       this.logger.warn('Login failed, invalid password', {
         email: loginRequest.email,
       });
-      throw new UnauthorizedException('invalid password');
+      throw new ConflictException('invalid password');
     }
 
     const access_token = this.generateAccessToken(
@@ -148,10 +150,12 @@ export class UsersService {
       email: user.email,
     });
     return {
-      email: user.email,
-      name: user.name,
-      access_token,
-      refresh_token,
+      data: {
+        email: user.email,
+        name: user.name,
+        access_token,
+        refresh_token,
+      },
     };
   }
 
@@ -209,8 +213,10 @@ export class UsersService {
 
     this.logger.info('Token refreshed successfully', { user_id: user.id });
     return {
-      access_token: new_access_token,
-      refresh_token: new_refresh_token,
+      data: {
+        access_token: new_access_token,
+        refresh_token: new_refresh_token,
+      },
     };
   }
 

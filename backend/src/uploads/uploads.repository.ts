@@ -136,10 +136,10 @@ export class UploadsRepository {
   }
 
   // Set the current_version_id in the files
-  async updateFileCurrentVersion(file_id: string, upload_id: string) {
+  async updateFileCurrentVersion(file_id: string, version_id: string) {
     await this.databaseService.execute(
       'UPDATE files SET current_version_id = ? WHERE id = ?',
-      [UuidUtils.toUuidBinary(file_id), UuidUtils.toUuidBinary(upload_id)],
+      [UuidUtils.toUuidBinary(version_id), UuidUtils.toUuidBinary(file_id)],
     );
   }
 

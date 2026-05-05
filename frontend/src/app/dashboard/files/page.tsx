@@ -40,9 +40,10 @@ export default function FilesPage() {
       const res = await filesApi.list(params);
       const payload = res.data.data;
 
-      const fileList = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
-      const fileTotal = payload?.total ?? fileList.length;
-  
+
+      const fileList = Array.isArray(payload?.files) ? payload.files : [];
+      const fileTotal = payload?.total ?? 0;
+      
       setFiles(fileList);
       setTotal(fileTotal);
     } catch {
@@ -57,7 +58,19 @@ export default function FilesPage() {
   const handleDownload = async (fileId: string) => {
     try {
       const res = await filesApi.getDownloadUrl(fileId);
-      window.open(res.data.data?.url || res.data.data, '_blank');
+      const url = res.data.data?.download_url;
+  
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+  
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = res.data.data?.filename || 'download';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
     } catch {
       toast.error('Download failed');
     }
@@ -76,7 +89,7 @@ export default function FilesPage() {
     }
   };
 
-  const filtered = files.filter(f => f.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = files.filter(f => f.filename?.toLowerCase().includes(search.toLowerCase()));
   const totalPages = Math.ceil(total / LIMIT);
 
   return (
@@ -134,7 +147,7 @@ export default function FilesPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {filtered.map(file => (
                 <div
-                  key={file.id}
+                  key={file.file_id}
                   className="file-row"
                   style={{
                     display: 'grid',
@@ -168,7 +181,7 @@ export default function FilesPage() {
                       <FileTypeIcon mimeType={file.mime_type} />
                     </div>
                     <span style={{ fontSize: 13, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {file.name}
+                      {file.filename}
                     </span>
                   </div>
 
@@ -204,9 +217,9 @@ export default function FilesPage() {
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, opacity: 0, transition: 'opacity 0.15s' }}
                   >
                     {[
-                      { icon: Download, title: 'Download', onClick: () => handleDownload(file.id), color: 'var(--text-secondary)' },
-                      { icon: Clock, title: 'Version history', onClick: () => setVersionsFileId(file.id), color: 'var(--text-secondary)' },
-                      { icon: Trash2, title: 'Delete', onClick: () => handleDelete(file.id), color: 'var(--destructive)', disabled: deletingId === file.id },
+                      { icon: Download, title: 'Download', onClick: () => handleDownload(file.file_id), color: 'var(--text-secondary)' },
+                      { icon: Clock, title: 'Version history', onClick: () => setVersionsFileId(file.file_id), color: 'var(--text-secondary)' },
+                      { icon: Trash2, title: 'Delete', onClick: () => handleDelete(file.file_id), color: 'var(--destructive)', disabled: deletingId === file.file_id },
                     ].map(({ icon: Icon, title, onClick, color, disabled }) => (
                       <button
                         key={title}

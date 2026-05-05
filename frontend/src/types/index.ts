@@ -21,8 +21,8 @@ export interface RegisterDTO {
 }
 
 export interface FileItem {
-  id: string;
-  name: string;
+  file_id: string;     // ← bukan id
+  filename: string; 
   mime_type: string;
   size: number;
   created_at: string;

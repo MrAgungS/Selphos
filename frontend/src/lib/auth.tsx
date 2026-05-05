@@ -38,7 +38,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const { data } = await authApi.login({ email, password });
-    const { access_token, refresh_token, user: userData } = data.data || data;
+    const { access_token, refresh_token, email: userEmail, name } = data.data;
+    const payload = JSON.parse(atob(access_token.split('.')[1]));
+    
+    const userData: AuthUser = {
+      id: payload.sub,
+      email: userEmail,
+      name,
+    };
+
     Cookies.set('access_token', access_token, { expires: 1 });
     Cookies.set('refresh_token', refresh_token, { expires: 7 });
     localStorage.setItem('selphos_user', JSON.stringify(userData));

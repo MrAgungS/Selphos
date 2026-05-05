@@ -25,19 +25,19 @@ export class S3Service {
     responseChecksumValidation: 'WHEN_REQUIRED',
   });
 
-  async generatePresignedUrl(object_key: string, mime_type: string) {
-    const publicS3 = new S3Client({
-      endpoint: process.env.RUSTFS_PUBLIC_ENDPOINT!,
-      region: 'auto',
-      credentials: {
-        accessKeyId: process.env.RUSTFS_ACCESS_KEY!,
-        secretAccessKey: process.env.RUSTFS_SECRET_KEY!,
-      },
-      forcePathStyle: true,
-      requestChecksumCalculation: 'WHEN_REQUIRED',
-      responseChecksumValidation: 'WHEN_REQUIRED',
-    });
+  private publicS3 = new S3Client({
+    endpoint: process.env.RUSTFS_PUBLIC_ENDPOINT!,
+    region: 'auto',
+    credentials: {
+      accessKeyId: process.env.RUSTFS_ACCESS_KEY!,
+      secretAccessKey: process.env.RUSTFS_SECRET_KEY!,
+    },
+    forcePathStyle: true,
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
+  });
 
+  async generatePresignedUrl(object_key: string, mime_type: string) {
     const command = new PutObjectCommand({
       Bucket: process.env.RUSTFS_BUCKET!,
       Key: object_key,
@@ -45,7 +45,7 @@ export class S3Service {
       ChecksumAlgorithm: undefined,
     });
 
-    return getSignedUrl(publicS3, command, { expiresIn: 900 });
+    return getSignedUrl(this.publicS3, command, { expiresIn: 900 });
   }
 
   async downloadToFile(
@@ -86,6 +86,6 @@ export class S3Service {
     expiresIn: number = 3600,
   ): Promise<string> {
     const command = new GetObjectCommand({ Bucket: bucket, Key: object_key });
-    return getSignedUrl(this.s3, command, { expiresIn });
+    return getSignedUrl(this.publicS3, command, { expiresIn });
   }
 }

@@ -125,18 +125,24 @@ export class FilesService {
       request,
     ) as RestoreVersion;
 
-    const fileExists = await this.filesRepository.findVersionByIdAndFile(
-      restoreVersionReq.version_id,
-      restoreVersionReq.user_id,
+    const fileVersions = await this.filesRepository.findVersionsByFileId(
       restoreVersionReq.file_id,
+      restoreVersionReq.user_id,
     );
-    if (!fileExists) {
-      // Check whether the file is missing or the version is incorrect
-      const versions = await this.filesRepository.findVersionsByFileId(
-        restoreVersionReq.file_id,
-        restoreVersionReq.user_id,
+    if (!fileVersions) throw new NotFoundException('File not found');
+
+    const versionBelongsToFile =
+      await this.filesRepository.findVersionByIdAndFile(
+        restoreVersionReq.version_id,
+        restoreVersionReq.file_id, // ← sebelumnya: user_id (SALAH)
+        restoreVersionReq.user_id, // ← sebelumnya: file_id (SALAH)
       );
-      if (!versions) throw new NotFoundException('File not found');
+
+    if (!versionBelongsToFile) {
+      const exists = await this.filesRepository.versionExists(
+        restoreVersionReq.version_id,
+      );
+      if (!exists) throw new NotFoundException('File version not found');
       throw new ForbiddenException('Version does not belong to this file');
     }
 
@@ -147,7 +153,7 @@ export class FilesService {
 
     return {
       file_id: restoreVersionReq.file_id,
-      RestoreVersion: restoreVersionReq.version_id,
+      restored_version_id: restoreVersionReq.version_id,
       message: 'File restored to selected version',
     };
   }

@@ -184,7 +184,7 @@ Set a specific version as the active version. This updates `files.current_versio
 
 ## Delete File (Soft Delete)
 Mark a file as deleted by setting `is_deleted = true` in the `files` table. The file is **not** removed from RustFS.
-**Endpoint:** `DELETE /api/s31/files/:file_id`
+**Endpoint:** `DELETE /api/s3/files/:file_id`
 
 **Headers:**
 ```

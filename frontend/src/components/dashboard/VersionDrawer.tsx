@@ -26,7 +26,11 @@ export default function VersionDrawer({ fileId, onClose }: VersionDrawerProps) {
   useEffect(() => {
     filesApi
       .getVersions(fileId)
-      .then(res => setVersions(res.data.data || []))
+      .then(res => {
+        const data = res.data.data;
+        const list = Array.isArray(data) ? data : Array.isArray(data?.versions) ? data.versions : [];
+        setVersions(list);
+      })
       .catch(() => toast.error('Failed to load versions'))
       .finally(() => setLoading(false));
   }, [fileId]);

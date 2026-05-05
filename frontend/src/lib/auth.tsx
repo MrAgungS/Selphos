@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const { data } = await authApi.login({ email, password });
-    const { access_token, refresh_token, email: userEmail, name } = data;
+    const { access_token, refresh_token, email: userEmail, name } = data.data;
     const payload = JSON.parse(atob(access_token.split('.')[1]));
     
     const userData: AuthUser = {
